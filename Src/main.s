@@ -12,7 +12,7 @@ decrement:
     cmp r0, #0           @ Compare the new value in R0 with 0
     ble loop             @ If the value is less than or equal to 0, jump to 'loop'
     movw r0, #0          @ Clear r0 for next iteration
-    add r3, r3, #1       @ Increase the iteration counter
+    add r7, r7, #1       @ Increase the iteration counter
     b decrement
 
 main:
@@ -21,7 +21,7 @@ main:
 
     ldr r2, =MEM_LOC     @ Load memory_location into R2
     str r0, [r2]         @ Store R0 into the address in R2
-    movw r3, #0          @ initialize R3 to store the iteration counter
+    movw r7, #0          @ initialize R3 to store the iteration counter
 
     bl decrement         @ Call the decrement function
 
