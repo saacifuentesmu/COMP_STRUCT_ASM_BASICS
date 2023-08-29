@@ -1,30 +1,56 @@
-.section .text
-.syntax unified
-.thumb
-.global main
+/*
+ * main.s
+ *  Created on: Aug 28, 2023
+ *      Author: saaci
+ */
+    .section .text
+    .syntax unified
+    .thumb
+    .global main
 
-.equ MEM_LOC, 0x20000200 @ Define a RAM address as MEM_LOC
+/** The LD2 of the NUCLEO is connected to PA5
+    Steps to control the Green LED:
+    1. Enable the GPIOA Clock
+    2. Set the Pin as Output
+    3. Set/Reset the bit 5 in the output register
+*/
 
-decrement:
-    ldr r0, [r2]         @ Load the value at address in R2 into R0
-    subs r0, r0, r1      @ Decrease the value in R0 by R1
-    str r0, [r2]         @ Store R0 back into the address in R2
-    cmp r0, #0           @ Compare the new value in R0 with 0
-    ble loop             @ If the value is less than or equal to 0, jump to 'loop'
-    movw r0, #0          @ Clear r0 for next iteration
-    add r7, r7, #1       @ Increase the iteration counter
-    b decrement
+/* The RCC (Reset and Clock Control) is the
+   subsystem to Enable/Disable any clock */
+.equ RCC_BASE,           0x40021000 @ RM0351 page 79
+.equ RCC_AHB2_OFFSET,    0x4C       @ RM0351 page 251
+.equ RCC_AHB2_GPIOA,     0x00000001 @ LSB of AHB2 clk enable register
+
+
+.equ GPIOA_BASE,         0x48000000 @ RM0351 page 78
+
+.equ GPIOA_MODER_OFFSET, 0x00       @ RM0351 page 303
+.equ GPIOA_MODER_MASK,   0x03       @ This is to clear the bits
+.equ GPIOA_MODER_OUTPUT, 0x01       @ This is to set as output
+
+.equ GPIOA_ODR_OFFSET,   0x14       @ RM0351 page 306
+.equ GPIOA_PIN_ODR_MASK, 0x01       @ a single bit per pin
+
+.equ GPIO_PIN_5,         5
 
 main:
-    ldr r0, =#813017     @ Load id into R0
-    movw r1, #1017       @ Load date into R1 Less Significant Bits (LSB)
+	@ Enable the GPIOA Clock
+	ldr r6, = RCC_BASE             @ load the RCC address into R6
+	ldr r5, [r6, RCC_AHB2_OFFSET]  @ read the current value of the AHB2 CLK enable reg
+	orr r5, RCC_AHB2_GPIOA         @ set the bit 0 to enable GPIOA
+	str r5, [r6, RCC_AHB2_OFFSET]  @ write the updated value into the AHB2 CLK enable reg
 
-    ldr r2, =MEM_LOC     @ Load memory_location into R2
-    str r0, [r2]         @ Store R0 into the address in R2
-    movw r7, #0          @ initialize R3 to store the iteration counter
+	@ Configure the Pin 5 of GPIOA as output
+	ldr r6, = GPIOA_BASE                                  @ load the GPIOA address
+	ldr r5, [r6, GPIOA_MODER_OFFSET]                      @ read the current value of MODER
+	bic r5, r5, #(GPIOA_MODER_MASK << (GPIO_PIN_5 * 2))   @ clear the bytes for pin 5
+	orr r5, r5, #(GPIOA_MODER_OUTPUT << (GPIO_PIN_5 * 2)) @ set the value as output for pin 5
+	str r5, [r6, GPIOA_MODER_OFFSET]                      @ write the updated value in MODER
 
-    bl decrement         @ Call the decrement function
-
-    @ End (Infinite loop)
 loop:
-    b loop               @ Stay in this loop forever
+	@ Toggle Pin 5
+	ldr r5, [r6, GPIOA_ODR_OFFSET]              @ read the current value of the output register
+	eor r5, #(GPIOA_PIN_ODR_MASK << GPIO_PIN_5) @ change the value of the bit  for pin 5
+	str r5, [r6, GPIOA_ODR_OFFSET]              @ write the updated value in the output register
+
+	b loop               @ Stay in this loop forever
