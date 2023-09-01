@@ -7,6 +7,7 @@
     .syntax unified
     .thumb
     .global main
+    .global SysTick_Handler
 
 /** The LD2 of the NUCLEO is connected to PA5
     Steps to control the Green LED:
@@ -21,6 +22,14 @@
 .equ RCC_AHB2_OFFSET,    0x4C       @ RM0351 page 251
 .equ RCC_AHB2_GPIOA,     0x00000001 @ LSB of AHB2 clk enable register
 
+/* The systick is part of the peripherals of the processor
+   thus it is in memory region 0xE0000000 (RM0351 page 76) */
+.equ 	SYSTICk_BASE,	 0xE000E010
+.equ 	SYSTICk_CTRL_OFFSET,	0x0		// SysTick Control and Status Register
+.equ 	SYSTICk_LOAD_OFFSET,	0x4		// SysTick reload Value Register
+.equ 	SYSTICk_VAL_OFFSET,	    0x8		// SysTick Current Value Register
+.equ 	SYSTICk_CALIB_OFFSET,	0xC		// SysTick Calibration Register
+
 
 .equ GPIOA_BASE,         0x48000000 @ RM0351 page 78
 
@@ -32,6 +41,28 @@
 .equ GPIOA_PIN_ODR_MASK, 0x01       @ a single bit per pin
 
 .equ GPIO_PIN_5,         5
+
+
+init_systick:
+	ldr r0, = SYSTICk_BASE
+
+	ldr r1, = (4000 - 1)
+	str r1, [r0, #SYSTICk_LOAD_OFFSET]
+	ldr r1, = 0
+	str r1, [r0, #SYSTICk_VAL_OFFSET]
+	ldr r1, [r0, SYSTICk_CTRL_OFFSET]
+	ldr r2, = 0b111
+	orr r1, r1, r2
+	str r1, [r0, SYSTICk_CTRL_OFFSET]
+
+	ldr r7, = 0
+	bx lr
+
+.type	SysTick_Handler,%function
+SysTick_Handler:
+	push {lr}
+	add r7,#1
+	pop {pc}
 
 gpioa_clk_en:
 	@ Enable the GPIOA Clock
@@ -64,6 +95,7 @@ gpio_toggle_pin:
 	bx lr
 
 main:
+	bl init_systick
 	bl gpioa_clk_en
 
 	ldr r0, = GPIOA_BASE @ preload the port address as first argument
